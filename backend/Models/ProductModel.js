@@ -16,6 +16,8 @@ const productSchema = new mongoose.Schema({
     isBiodegradable: Boolean
   },
 
+  images: [{ type: String }],  // Array of Cloudinary URLs for product images
+
   createdAt: { type: Date, default: Date.now }
 });
 

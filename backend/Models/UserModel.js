@@ -3,10 +3,10 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
-  password: String,        // You should hash this before saving
-  passwordHash: String,    // Optional, if you store hashed separately
-
+  password: String,
   ecoCoins: { type: Number, default: 0 },
+
+  profileImage: { type: String, default: '' },  // Cloudinary URL or empty string
 
   co2SavedLogs: [{
     date: { type: Date, default: Date.now },
