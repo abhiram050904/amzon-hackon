@@ -74,6 +74,28 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
 
+  shippingAddress: {
+  fullName: String,
+  addressLine1: String,
+  addressLine2: String,
+  city: String,
+  state: String,
+  postalCode: String,
+  country: String,
+  phone: String
+},
+
+paymentInfo: {
+  provider: { type: String, enum: ['stripe', 'razorpay', 'paypal', 'cod'] },
+  transactionId: { type: String },
+  paidAt: { type: Date }
+},
+
+expectedDeliveryDate: { type: Date },
+deliveredAt: { type: Date },
+discountPercent: { type: Number, default: 0 },
+discountReason: { type: String },
+
   createdAt: { 
     type: Date, 
     default: Date.now 
