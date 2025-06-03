@@ -1,6 +1,9 @@
 const GroupOrder = require('../Models/GroupOrderModel');
 const Product=require('../Models/ProductModel')
 const Order=require('../Models/OrderModel')
+const Cart=require('../Models/CartItemModel')
+const User=require('../Models/UserModel')
+const { v4: uuidv4 } = require('uuid');
 
 const generateGroupOrderCode = () => {
   return uuidv4().split('-')[0].toUpperCase();
@@ -24,7 +27,6 @@ const createGroupOrder = async (req, res) => {
       participants: [{ userId: initiator }],
       groupOrderCode,
       status: 'open',
-      discountPercent: 10,
     });
 
     await groupOrder.save();
@@ -40,7 +42,7 @@ const createGroupOrder = async (req, res) => {
 const joinGroupOrder = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { groupOrderId } = req.body;
+    const { groupOrderId } = req.params;
 
     if (!groupOrderId) {
       return res.status(400).json({ message: 'groupOrderId is required' });
@@ -118,7 +120,7 @@ const listActiveGroupOrdersForUser = async (req, res) => {
 
     // Find group orders where user is initiator or participant and status not 'completed'
     const groupOrders = await GroupOrder.find({
-      status: { $in: ['open', 'closed'] },
+      status: { $in: ['open', 'closed','readyForPayment'] },
       $or: [
         { initiator: userId },
         { 'participants.userId': userId }
@@ -176,7 +178,7 @@ const leaveGroupOrder = async (req, res) => {
 const deleteGroupOrder = async (req, res) => {
   try {
     const { groupOrderId } = req.params;
-    const userId = req.user._id; // assuming auth middleware sets req.user
+    const userId = req.user.id;
 
     if (!groupOrderId) {
       return res.status(400).json({ message: 'groupOrderId param is required' });
@@ -285,10 +287,10 @@ const removeItemsFromGroupOrder = async (req, res) => {
   try {
     const userId = req.user.id;
     const { groupOrderId } = req.params;
-    const { selectedItems } = req.body;
+    const { itemId} = req.body;
 
-    if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
-      return res.status(400).json({ message: 'Selected items are required' });
+    if (!itemId) {
+      return res.status(400).json({ message: 'productId is required' });
     }
 
     const groupOrder = await GroupOrder.findById(groupOrderId);
@@ -296,22 +298,25 @@ const removeItemsFromGroupOrder = async (req, res) => {
       return res.status(404).json({ message: 'Group order not found' });
     }
 
-    // Remove only the matching items added by the same user
-    groupOrder.items = groupOrder.items.filter(groupItem => {
-      const match = selectedItems.some(sel =>
-        groupItem.userId.toString() === userId &&
-        groupItem.productId.toString() === sel.productId &&
-        groupItem.returnPackage === (sel.returnPackage || false)
-      );
-      return !match; // keep only non-matching items
-    });
+    const matchingItem = groupOrder.items.find(
+      item => item._id.toString() === itemId && item.userId.toString() === userId.toString()
+    );
+
+    if (!matchingItem) {
+      return res.status(403).json({ message: 'Item not found or not owned by the user' });
+    }
+
+      // Remove the matching item
+    groupOrder.items = groupOrder.items.filter(
+      item => !(item._id.toString() === itemId && item.userId.toString() === userId.toString())
+    );
+
 
     await groupOrder.save();
 
-    res.status(200).json({ message: 'Selected items removed from group order' });
-
+    res.status(200).json({ message: 'Item removed from group order' });
   } catch (err) {
-    console.error('Error removing items from group order:', err);
+    console.error('Error removing item from group order:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -320,7 +325,7 @@ const removeItemsFromGroupOrder = async (req, res) => {
 const updateGroupOrderItemQuantity = async (req, res) => {
   try {
     const { groupOrderId } = req.params;
-    const { productId, userId, returnPackage = false, newQuantity } = req.body;
+    const { productId, userId, newQuantity } = req.body;
 
     if (!productId || !userId || !newQuantity || newQuantity < 1) {
       return res.status(400).json({ message: 'Valid productId, userId, and newQuantity are required' });
@@ -334,8 +339,7 @@ const updateGroupOrderItemQuantity = async (req, res) => {
     const item = groupOrder.items.find(
       (i) =>
         i.userId.toString() === userId &&
-        i.productId.toString() === productId &&
-        i.returnPackage === returnPackage
+        i.productId.toString() === productId
     );
 
     if (!item) {
@@ -410,7 +414,7 @@ const setGroupOrderPackagingType = async (req, res) => {
       return res.status(400).json({ message: 'Cannot change packaging type for closed or completed group orders' });
     }
 
-    groupOrder.packagingType = packagingType; // You will need to add packagingType field in GroupOrder model
+    groupOrder.packagingType = packagingType; 
 
     await groupOrder.save();
 
@@ -423,7 +427,7 @@ const setGroupOrderPackagingType = async (req, res) => {
 
 
 const finalizeGroupOrder = async (req, res) => {
-  try {
+   try {
     const { groupOrderId } = req.params;
     const { packagingType, returnPackage } = req.body;
     const initiatorId = req.user.id;
@@ -438,7 +442,7 @@ const finalizeGroupOrder = async (req, res) => {
     }
 
     if (groupOrder.status !== 'closed') {
-      return res.status(400).json({ message: 'Group order must be closed before finalizing' });
+      groupOrder.status = 'closed'
     }
 
     if (!groupOrder.items || groupOrder.items.length === 0) {
@@ -463,14 +467,36 @@ const finalizeGroupOrder = async (req, res) => {
     const discountPercent = groupOrder.discountPercent || 0;
     const discountedTotal = +(totalAmount * ((100 - discountPercent) / 100)).toFixed(2);
 
-    // Step 3: Update group order with packing details and price
+    // Step 3: Update group order
     groupOrder.packagingType = packagingType;
     groupOrder.returnPackage = !!returnPackage;
-    groupOrder.totalAmount = discountedTotal; // ← add this to schema if not present
-    groupOrder.status = 'readyForPayment'; // status to indicate it’s ready but not yet paid
+    groupOrder.totalAmount = discountedTotal;
+    groupOrder.status = 'readyForPayment';
+
     await groupOrder.save();
 
-    // Step 4: Respond with all necessary details for payment screen
+    // Step 4: Reward ecoCoins PER ITEM
+    const coinPerItem =
+      (packagingType === 'eco' ? 10 : 0) +
+      (returnPackage ? 10 : 0);
+
+    if (coinPerItem > 0) {
+      const coinMap = new Map(); // userId -> totalCoinsToAdd
+
+      for (const item of groupOrder.items) {
+        const uid = item.userId.toString();
+        const coins = coinMap.get(uid) || 0;
+        coinMap.set(uid, coins + coinPerItem * item.quantity);
+      }
+
+      await Promise.all(
+        Array.from(coinMap.entries()).map(([uid, coins]) =>
+          User.findByIdAndUpdate(uid, { $inc: { ecoCoins: coins } })
+        )
+      );
+    }
+
+    // Step 5: Response
     res.status(200).json({
       message: 'Group order finalized. Proceed to payment.',
       groupOrderId,
@@ -493,7 +519,6 @@ const updateGroupOrderDiscount = async (req, res) => {
   try {
     const { groupOrderId } = req.params;
     const { discountPercent } = req.body;
-    const userId = req.user._id;
 
     if (discountPercent == null || discountPercent < 0 || discountPercent > 100) {
       return res.status(400).json({ message: 'Invalid discountPercent value' });
@@ -502,9 +527,6 @@ const updateGroupOrderDiscount = async (req, res) => {
     const groupOrder = await GroupOrder.findById(groupOrderId);
     if (!groupOrder) return res.status(404).json({ message: 'Group order not found' });
 
-    if (groupOrder.initiator.toString() !== userId.toString()) {
-      return res.status(403).json({ message: 'Only the initiator can update the discount' });
-    }
 
     groupOrder.discountPercent = discountPercent;
     await groupOrder.save();

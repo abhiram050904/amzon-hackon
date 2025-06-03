@@ -8,12 +8,12 @@ const groupOrderSchema = new mongoose.Schema({
     joinedAt: { type: Date, default: Date.now }
   }],
 
-  discountPercent: { type: Number, default: 10 }, // e.g., 10% discount on package or total order
+  discountPercent: { type: Number, default: 5 },
 
 
   groupOrderCode: { type: String, unique: true, required: true }, // invite/share code
 
-  status: { type: String, enum: ['open', 'closed', 'completed'], default: 'open' },
+  status: { type: String, enum: ['open', 'closed', 'completed','readyForPayment'], default: 'open' },
 
   items: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

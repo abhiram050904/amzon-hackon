@@ -6,6 +6,7 @@ const cloudinary = require('cloudinary').v2
 const userRoutes=require('./routes/UserRoutes')
 const productRoutes=require('./routes/ProductRoutes')
 const cartRoutes=require('./routes/CartRoutes')
+const groupOrderRoutes=require('./routes/GroupOrderRoutes')
 dotenv.config();
 
 const app = express();
@@ -16,6 +17,9 @@ app.use(express.json());
 app.use('/api/user',userRoutes)
 app.use('/api/products',productRoutes)
 app.use('/api/cart',cartRoutes)
+app.use('/api/group-order',groupOrderRoutes)
+
+
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
