@@ -5,9 +5,12 @@ const productSchema = new mongoose.Schema({
   description: String,
   price: Number,
   stock: Number,
-
+  brand:String,
+  soldBy:String,
+  category: { type: String, required: true },
   co2Emission: Number, // grams/kg
   ecoRating: { type: Number, min: 1, max: 5 },
+  normalRating: { type: Number, min: 1, max: 5 },
   ecoModesAvailable: Boolean,
 
   ecoImpact: {

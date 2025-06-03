@@ -4,6 +4,7 @@ const cors = require('cors');
 const mongoose=require('mongoose')
 const cloudinary = require('cloudinary').v2
 const userRoutes=require('./routes/UserRoutes')
+const productRoutes=require('./routes/ProductRoutes')
 dotenv.config();
 
 const app = express();
@@ -12,7 +13,7 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use('/api/user',userRoutes)
-
+app.use('/api/products',productRoutes)
 
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
