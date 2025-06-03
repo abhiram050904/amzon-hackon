@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const orderSchema = new mongoose.Schema({
   userId: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -17,25 +16,33 @@ const orderSchema = new mongoose.Schema({
       type: Number, 
       required: true, 
       min: 1 
+    },
+    packagingType: {
+      type: String,
+      enum: ['eco', 'gift', 'standard'],
+      default: 'standard'
+    },
+    priceAtPurchase: {
+      type: Number,
+      required: true
     }
   }],
 
-  // Order Type & Emissions
   orderType: { 
     type: String, 
-    enum: ['normal', 'eco'], 
+    enum: ['normal', 'eco','standard'], 
     default: 'normal' 
   },
+
   co2Reduced: { 
     type: Number, 
     default: 0 
-  }, // CO₂ saved by eco options
+  },
   ecoCoinsEarned: { 
     type: Number, 
     default: 0 
   },
 
-  // Group Order Fields
   isGroupOrder: { 
     type: Boolean, 
     default: false 
@@ -46,13 +53,11 @@ const orderSchema = new mongoose.Schema({
     default: null 
   },
 
-  // Returns
-  returnPackageSelected: { 
+  returnPackage: { 
     type: Boolean, 
     default: false 
   },
 
-  // Payment and Delivery Status Tracking
   paymentStatus: { 
     type: String, 
     enum: ['pending', 'paid', 'failed'], 
@@ -64,10 +69,13 @@ const orderSchema = new mongoose.Schema({
     default: 'processing' 
   },
 
+  totalAmount: {
+    type: Number,
+    required: true
+  },
+
   createdAt: { 
     type: Date, 
     default: Date.now 
   }
 });
-
-module.exports = mongoose.model('Order', orderSchema);

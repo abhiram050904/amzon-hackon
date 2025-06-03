@@ -10,11 +10,23 @@ const groupOrderSchema = new mongoose.Schema({
 
   discountPercent: { type: Number, default: 10 }, // e.g., 10% discount on package or total order
 
-  minParticipants: { type: Number, default: 2 },  // minimum users needed to activate discount
 
   groupOrderCode: { type: String, unique: true, required: true }, // invite/share code
 
   status: { type: String, enum: ['open', 'closed', 'completed'], default: 'open' },
+
+  items: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    priceAtAddition: { type: Number, required: true },
+    returnPackage: {type: Boolean,default: false},
+    addedAt: { type: Date, default: Date.now }
+  }],
+
+  returnPackage: {type: Boolean,default: false},
+  packagingType: { type: String, enum: ['eco', 'gift', 'standard'], default: 'standard' },
+  totalAmount: { type: Number, default: 0 },
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
