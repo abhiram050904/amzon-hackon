@@ -49,20 +49,40 @@ const updateCartItemQuantity = async (req, res) => {
     }
 
     const cart = await Cart.findOne({ userId });
-
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
+    if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
     const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
+    if (itemIndex === -1) return res.status(404).json({ message: 'Product not found in cart' });
 
-    if (itemIndex === -1) {
-      return res.status(404).json({ message: 'Product not found in cart' });
-    }
+    const item = cart.items[itemIndex];
+    const prevQuantity = item.quantity;
+    const deltaQuantity = quantity - prevQuantity;
 
-    cart.items[itemIndex].quantity = quantity;
-
+    item.quantity = quantity;
     await cart.save();
+
+    // If returnPackage is true, adjust ecoCoins and co2SavedLogs
+    if (item.returnPackage && deltaQuantity !== 0) {
+      const ecoCoinsPerProduct = 10;
+      const ecoCoinsChange = deltaQuantity * ecoCoinsPerProduct;
+      const co2Change = deltaQuantity * 100;
+
+      await User.findByIdAndUpdate(userId, {
+        $inc: { ecoCoins: ecoCoinsChange },
+        $push: {
+          ecoIncentives: {
+            type: 'quantity_update',
+            date: new Date(),
+            ecoCoinsEarned: ecoCoinsChange
+          },
+          co2SavedLogs: {
+            reason: 'quantity_update',
+            date: new Date(),
+            amount: co2Change
+          }
+        }
+      });
+    }
 
     return res.status(200).json({ message: 'Quantity updated', cart });
   } catch (err) {
@@ -70,6 +90,9 @@ const updateCartItemQuantity = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+
+
 
 const updateReturnPackageFlag = async (req, res) => {
   try {
@@ -135,18 +158,36 @@ const removeItemFromCart = async (req, res) => {
     }
 
     const cart = await Cart.findOne({ userId });
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
+    if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
-    const updatedItems = cart.items.filter(item => item._id.toString() !== cartItemId);
+    const item = cart.items.find(item => item._id.toString() === cartItemId);
+    if (!item) return res.status(404).json({ message: 'Cart item not found' });
 
-    if (updatedItems.length === cart.items.length) {
-      return res.status(404).json({ message: 'Cart item not found' });
-    }
+    const ecoCoinsPerProduct = 10;
+    const ecoCoinsChange = item.returnPackage ? -item.quantity * ecoCoinsPerProduct : 0;
+    const co2Change = item.returnPackage ? -item.quantity * 100 : 0;
 
-    cart.items = updatedItems;
+    // Remove the item
+    cart.items = cart.items.filter(item => item._id.toString() !== cartItemId);
     await cart.save();
+
+    if (ecoCoinsChange !== 0) {
+      await User.findByIdAndUpdate(userId, {
+        $inc: { ecoCoins: ecoCoinsChange },
+        $push: {
+          ecoIncentives: {
+            type: 'item_removed',
+            date: new Date(),
+            ecoCoinsEarned: ecoCoinsChange
+          },
+          co2SavedLogs: {
+            reason: 'item_removed',
+            date: new Date(),
+            amount: co2Change
+          }
+        }
+      });
+    }
 
     return res.status(200).json({ message: 'Cart item removed', cart });
   } catch (err) {
@@ -165,13 +206,42 @@ const clearCart = async (req, res) => {
     }
 
     const cart = await Cart.findOne({ userId });
+    if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
+    // Calculate ecoCoins and CO₂ to deduct
+    let totalEcoCoinsToDeduct = 0;
+    let totalCO2ToDeduct = 0;
+
+    for (const item of cart.items) {
+      if (item.returnPackage) {
+        const quantity = item.quantity || 1;
+        totalEcoCoinsToDeduct += quantity * 10;
+        totalCO2ToDeduct += quantity * 100;
+      }
     }
 
+    // Clear the cart
     cart.items = [];
     await cart.save();
+
+    // Update ecoCoins and logs only if deduction is needed
+    if (totalEcoCoinsToDeduct > 0) {
+      await User.findByIdAndUpdate(userId, {
+        $inc: { ecoCoins: -totalEcoCoinsToDeduct },
+        $push: {
+          ecoIncentives: {
+            type: 'cart_cleared',
+            date: new Date(),
+            ecoCoinsEarned: -totalEcoCoinsToDeduct
+          },
+          co2SavedLogs: {
+            reason: 'cart_cleared',
+            date: new Date(),
+            amount: -totalCO2ToDeduct
+          }
+        }
+      });
+    }
 
     return res.status(200).json({ message: 'Cart cleared', cart });
   } catch (err) {
