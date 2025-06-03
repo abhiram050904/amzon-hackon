@@ -8,19 +8,19 @@ const {
   clearCart,
   getCart
 } = require('../controllers/CartController');
-
-//it will be userid
-router.get('/:userId', getCart);
+const authUser = require('../middlewares/authUser');
 
 
-router.post('/add', addToCart);
+router.get('/',authUser, getCart);
 
-router.put('/update/quantity', updateCartItemQuantity);
+router.post('/add',authUser,addToCart);
 
-router.put('/update/return-package', updateReturnPackageFlag);
+router.put('/update/quantity', authUser,updateCartItemQuantity);
 
-router.delete('/remove', removeItemFromCart);
+router.put('/update/return-package',authUser, updateReturnPackageFlag);
 
-router.delete('/clear/:userId', clearCart);
+router.delete('/remove',authUser, removeItemFromCart);
+
+router.delete('/clear',authUser, clearCart);
 
 module.exports = router;

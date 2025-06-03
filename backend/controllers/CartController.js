@@ -4,7 +4,8 @@ const User=require('../Models/UserModel')
 // Add item to cart or increment quantity
 const addToCart = async (req, res) => {
   try {
-    const { userId, productId } = req.body;
+    const {productId } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !productId) {
       return res.status(400).json({ message: 'userId and productId are required' });
@@ -42,7 +43,8 @@ const addToCart = async (req, res) => {
 
 const updateCartItemQuantity = async (req, res) => {
   try {
-    const { userId, productId, quantity } = req.body;
+    const {productId, quantity } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !productId || typeof quantity !== 'number' || quantity < 1) {
       return res.status(400).json({ message: 'userId, productId and valid quantity are required' });
@@ -96,7 +98,8 @@ const updateCartItemQuantity = async (req, res) => {
 
 const updateReturnPackageFlag = async (req, res) => {
   try {
-    const { userId, productId, returnPackage } = req.body;
+    const {productId, returnPackage } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !productId || typeof returnPackage !== 'boolean') {
       return res.status(400).json({ message: 'userId, productId and returnPackage (boolean) are required' });
@@ -151,7 +154,8 @@ const updateReturnPackageFlag = async (req, res) => {
 // Remove a product from cart
 const removeItemFromCart = async (req, res) => {
   try {
-    const { userId, cartItemId } = req.body;
+    const {cartItemId } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !cartItemId) {
       return res.status(400).json({ message: 'userId and cartItemId are required' });
@@ -199,7 +203,7 @@ const removeItemFromCart = async (req, res) => {
 // Clear all items from cart
 const clearCart = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.user.id;
 
     if (!userId) {
       return res.status(400).json({ message: 'userId is required' });
@@ -253,10 +257,10 @@ const clearCart = async (req, res) => {
 // Get user's cart with populated product info
 const getCart = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userId = req.user.id;
 
     if (!userId) {
-      return res.status(400).json({ message: 'userId param is required' });
+      return res.status(400).json({ message: 'userId  is required' });
     }
 
     const cart = await Cart.findOne({ userId }).populate('items.productId', 'name price ecoRating');
