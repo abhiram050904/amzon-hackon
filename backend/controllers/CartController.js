@@ -1,6 +1,6 @@
-const Cart = require('../Models/CartModel');
+const Cart = require('../Models/CartItemModel');
 const Product = require('../Models/ProductModel');
-
+const User=require('../Models/UserModel')
 // Add item to cart or increment quantity
 const addToCart = async (req, res) => {
   try {
@@ -40,7 +40,6 @@ const addToCart = async (req, res) => {
   }
 };
 
-// Update quantity of a cart item
 const updateCartItemQuantity = async (req, res) => {
   try {
     const { userId, productId, quantity } = req.body;
@@ -81,36 +80,42 @@ const updateReturnPackageFlag = async (req, res) => {
     }
 
     const cart = await Cart.findOne({ userId });
-
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
+    if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
     const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
+    if (itemIndex === -1) return res.status(404).json({ message: 'Product not found in cart' });
 
-    if (itemIndex === -1) {
-      return res.status(404).json({ message: 'Product not found in cart' });
-    }
-
-    // Current returnPackage value before update
     const prevReturnPackage = cart.items[itemIndex].returnPackage || false;
+    const quantity = cart.items[itemIndex].quantity || 1;
 
-    // Update the flag
     cart.items[itemIndex].returnPackage = returnPackage;
-
     await cart.save();
 
-    // Only update ecoCoins if the flag changed from false -> true or true -> false
     if (prevReturnPackage !== returnPackage) {
-      // Define ecoCoins to add or remove per product for return package
-      const ecoCoinsPerProduct = 5;
+      const ecoCoinsPerProduct = 10;
+      const ecoCoinsChange = returnPackage 
+        ? ecoCoinsPerProduct * quantity 
+        : -ecoCoinsPerProduct * quantity;
 
-      // Calculate coins to adjust based on product quantity
-      const quantity = cart.items[itemIndex].quantity || 1;
-      const ecoCoinsChange = returnPackage ? ecoCoinsPerProduct * quantity : -ecoCoinsPerProduct * quantity;
+      const co2Change = returnPackage 
+        ? 100 * quantity // example grams saved
+        : -100 * quantity;
 
-      // Update user's ecoCoins accordingly
-      await User.findByIdAndUpdate(userId, { $inc: { ecoCoins: ecoCoinsChange } });
+      await User.findByIdAndUpdate(userId, {
+        $inc: { ecoCoins: ecoCoinsChange },
+        $push: {
+          ecoIncentives: {
+            type: 'return_package',
+            date: new Date(),
+            ecoCoinsEarned: ecoCoinsChange
+          },
+          co2SavedLogs: {
+            reason: 'return_package',
+            date: new Date(),
+            amount: co2Change
+          }
+        }
+      });
     }
 
     return res.status(200).json({ message: 'Return package flag updated', cart });
@@ -123,10 +128,10 @@ const updateReturnPackageFlag = async (req, res) => {
 // Remove a product from cart
 const removeItemFromCart = async (req, res) => {
   try {
-    const { userId, productId } = req.body;
+    const { userId, cartItemId } = req.body;
 
-    if (!userId || !productId) {
-      return res.status(400).json({ message: 'userId and productId are required' });
+    if (!userId || !cartItemId) {
+      return res.status(400).json({ message: 'userId and cartItemId are required' });
     }
 
     const cart = await Cart.findOne({ userId });
@@ -134,18 +139,18 @@ const removeItemFromCart = async (req, res) => {
       return res.status(404).json({ message: 'Cart not found' });
     }
 
-    const updatedItems = cart.items.filter(item => item.productId.toString() !== productId);
+    const updatedItems = cart.items.filter(item => item._id.toString() !== cartItemId);
 
     if (updatedItems.length === cart.items.length) {
-      return res.status(404).json({ message: 'Product not found in cart' });
+      return res.status(404).json({ message: 'Cart item not found' });
     }
 
     cart.items = updatedItems;
     await cart.save();
 
-    return res.status(200).json({ message: 'Product removed from cart', cart });
+    return res.status(200).json({ message: 'Cart item removed', cart });
   } catch (err) {
-    console.error('Error removing item from cart:', err);
+    console.error('Error removing cart item:', err);
     return res.status(500).json({ error: err.message });
   }
 };
