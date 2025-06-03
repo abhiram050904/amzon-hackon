@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const mongoose=require('mongoose')
 const cloudinary = require('cloudinary').v2
+const userRoutes=require('./routes/UserRoutes')
 dotenv.config();
 
 const app = express();
@@ -10,7 +11,7 @@ const app = express();
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-
+app.use('/api/user',userRoutes)
 
 
 mongoose.connect(process.env.MONGO_URI, {
