@@ -25,7 +25,7 @@ const groupOrderSchema = new mongoose.Schema({
   }],
 
   returnPackage: {type: Boolean,default: false},
-  packagingType: { type: String, enum: ['eco', 'gift', 'standard'], default: 'standard' },
+  packagingType: { type: String, enum: ['eco', 'gift', 'standard'], default: 'eco' },
   totalAmount: { type: Number, default: 0 },
 
   createdAt: { type: Date, default: Date.now },

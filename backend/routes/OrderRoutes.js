@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const {
-  prepareIndividualOrder,
+
   createOrderAfterPayment,
-  getMyOrders,
+
   getOrderById,
   getAllOrders,
   createRazorpayOrder,
@@ -32,12 +32,13 @@ router.post('/create-group-order',authUser,handleGroupOrderBeforePayment)
     // router.post('/razorpay/verify', authUser, verifyRazorpayPayment);
 
     // // Create COD order (fallback)
-    // router.post('/cod', authUser, createCODOrder);
+    router.post('/cod', authUser, createCODOrder);
 
     // // Create order directly (generic, if needed)
     // router.post('/create', authUser, createOrderAfterPayment);
 
     // // Get logged-in user's orders
+
     router.get('/myorders', authUser, getUserOrders);
     router.get('/orderById/:orderId',authUser,getOrderById);
 

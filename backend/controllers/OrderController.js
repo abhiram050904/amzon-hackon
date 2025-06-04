@@ -13,7 +13,7 @@ const handleIndividualOrderBeforePayment = async (req, res) => {
     const {
       items,
       packagingType,
-      returnPackage,
+      returnPackage, 
       shippingAddress,
       discountPercent,
       discountReason
@@ -131,10 +131,9 @@ const handleGroupOrderBeforePayment = async (req, res) => {
       isGroupOrder: true,
       groupOrderId: groupOrder._id,
       products: orderItems,
-      packagingType: groupOrder.packagingType,
+      PackageType: groupOrder.packagingType,
       returnPackage: groupOrder.returnPackage,
       shippingAddress,
-      isGroupOrder: false,
       discountPercent,
       discountReason: 'Group Order Discount',
       totalAmount: Number(discountedAmount.toFixed(2)),
@@ -227,17 +226,25 @@ const verifyRazorpayPayment = async (req, res) => {
 // // 3. Create COD Order directly (fallback)
 const createCODOrder = async (req, res) => {
   try {
-    const orderDetails = req.body;
+    const {orderId} = req.body;
 
-    req.body = {
-      ...orderDetails,
-      paymentInfo: {
-        provider: 'cod',
-        transactionId: `COD-${Date.now()}`
-      }
+
+    const orderObject=await Order.findById(orderId);
+    if (!orderObject) return res.status(404).json({ message: 'Order not found' });
+
+    orderObject.paymentStatus = 'cod';
+    orderObject.paymentInfo = {
+      provider: 'cod',
+      transactionId: `COD-${Date.now()}`,
+      paidAt: Date.now()
     };
 
+    // console.log(orderObject)
+
+    req.body={orderId}
+
     await createOrderAfterPayment(req, res);
+
   } catch (err) {
     console.error('COD order creation failed:', err);
     res.status(500).json({ message: 'COD order failed' });
@@ -246,119 +253,101 @@ const createCODOrder = async (req, res) => {
 
 
 // // 2. Create order after successful payment
-// const createOrderAfterPayment = async (req, res) => {
-//   try {
-//     const {
-//       userId,
-//       isGroupOrder,
-//       groupOrderId,
-//       products,
-//       packagingType,
-//       returnPackage,
-//       totalAmount,
-//       discountPercent,
-//       discountReason,
-//       paymentInfo,
-//       shippingAddress
-//     } = req.body;
+const createOrderAfterPayment = async (req, res) => {
+  try {
+    const {orderId} = req.body;
 
-//     let ecoCoinsEarned = 0;
-//     let co2Reduced = 0;
-//     const ecoIncentives = [];
-//     const co2SavedLogs = [];
+    const orderObject=await Order.findById(orderId);
+    let ecoCoinsEarned = 0;
+    let co2Reduced = 0;
+    const ecoIncentives = [];
+    const co2SavedLogs = [];
 
-//     const dateNow = new Date();
+    const dateNow = new Date();
 
-//     if (packagingType === 'eco') {
-//       const coins = products.reduce((sum, p) => sum + p.quantity * 10, 0);
-//       const co2 = products.reduce((sum, p) => sum + p.quantity * 5, 0);
-//       ecoCoinsEarned += coins;
-//       co2Reduced += co2;
-//       ecoIncentives.push({ date: dateNow, type: 'eco_purchase', ecoCoinsEarned: coins });
-//       co2SavedLogs.push({ date: dateNow, amount: co2, reason: 'eco_purchase' });
-//     }
+    console.log("this is the packaging type",orderObject.PackageType)
 
-//     if (returnPackage) {
-//       const coins = products.reduce((sum, p) => sum + p.quantity * 10, 0);
-//       ecoCoinsEarned += coins;
-//       ecoIncentives.push({ date: dateNow, type: 'return_package', ecoCoinsEarned: coins });
-//       co2SavedLogs.push({ date: dateNow, amount: 0, reason: 'return_package' }); // Optional: define CO2 savings if needed
-//     }
+    const products = orderObject.products || [];
+    const returnPackage = orderObject.returnPackage;
+    const packagingType=orderObject.PackageType
+    if (packagingType === 'eco') {
+      const coins = products.reduce((sum, p) => sum + p.quantity * 10, 0);
+      const co2 = products.reduce((sum, p) => sum + p.quantity * 5, 0);
+      ecoCoinsEarned += coins;
+      co2Reduced += co2;
+      ecoIncentives.push({ date: dateNow, type: 'eco_purchase', ecoCoinsEarned: coins });
+      co2SavedLogs.push({ date: dateNow, amount: co2, reason: 'eco_purchase' });
+    }
 
-//     const order = new Order({
-//       userId,
-//       isGroupOrder,
-//       groupOrderId: isGroupOrder ? groupOrderId : null,
-//       products,
-//       packagingType,
-//       returnPackage,
-//       totalAmount,
-//       discountPercent,
-//       discountReason,
-//       paymentInfo: {
-//         provider: paymentInfo.provider,
-//         transactionId: paymentInfo.transactionId,
-//         paidAt: dateNow
-//       },
-//       paymentStatus: 'paid',
-//       deliveryStatus: 'processing',
-//       orderType: packagingType === 'eco' ? 'eco' : 'normal',
-//       shippingAddress,
-//       ecoCoinsEarned,
-//       co2Reduced,
-//       expectedDeliveryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
-//     });
+    if (returnPackage) {
+      const coins = products.reduce((sum, p) => sum + p.quantity * 10, 0);
+      ecoCoinsEarned += coins;
+      ecoIncentives.push({ date: dateNow, type: 'return_package', ecoCoinsEarned: coins });
+      co2SavedLogs.push({ date: dateNow, amount: 0, reason: 'return_package' }); // Optional: define CO2 savings if needed
+    }
 
-//     await order.save();
 
-//     const ecoDataMap = {};
-//     for (const p of products) {
-//       if (!ecoDataMap[p.addedBy]) ecoDataMap[p.addedBy] = { ecoCoins: 0, co2: 0, returnEcoCoins: 0 };
-//       if (packagingType === 'eco') {
-//         ecoDataMap[p.addedBy].ecoCoins += p.quantity * 10;
-//         ecoDataMap[p.addedBy].co2 += p.quantity * 5;
-//       }
-//       if (returnPackage) {
-//         ecoDataMap[p.addedBy].returnEcoCoins += p.quantity * 10;
-//       }
-//     }
+     const order = await Order.findById(orderObject._id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
-//     for (const userId in ecoDataMap) {
-//       const ecoCoinsEarned = ecoDataMap[userId].ecoCoins + ecoDataMap[userId].returnEcoCoins;
-//       const co2Reduced = ecoDataMap[userId].co2;
-//       const ecoIncentives = [];
-//       const co2SavedLogs = [];
 
-//       if (ecoDataMap[userId].ecoCoins > 0) {
-//         ecoIncentives.push({ date: dateNow, type: 'eco_purchase', ecoCoinsEarned: ecoDataMap[userId].ecoCoins });
-//         co2SavedLogs.push({ date: dateNow, amount: co2Reduced, reason: 'eco_purchase' });
-//       }
-//       if (ecoDataMap[userId].returnEcoCoins > 0) {
-//         ecoIncentives.push({ date: dateNow, type: 'return_package', ecoCoinsEarned: ecoDataMap[userId].returnEcoCoins });
-//       }
+    order.deliveryStatus = 'processing';
+    order.orderType = packagingType === 'eco' ? 'eco' : 'normal';
+    order.ecoCoinsEarned = ecoCoinsEarned;
+    order.co2Reduced = co2Reduced;
+    order.expectedDeliveryDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 
-//       await User.findByIdAndUpdate(userId, {
-//         $inc: { ecoCoins: ecoCoinsEarned },
-//         $push: {
-//           orders: order._id,
-//           ecoIncentives: { $each: ecoIncentives },
-//           co2SavedLogs: { $each: co2SavedLogs }
-//         }
-//       });
-//     }
+    await order.save();
 
-//     res.status(201).json({ message: 'Order created successfully', order });
-//   } catch (err) {
-//     console.error('Error creating order after payment:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+
+    const ecoDataMap = {};
+    for (const p of products) {
+      if (!ecoDataMap[p.addedBy]) ecoDataMap[p.addedBy] = { ecoCoins: 0, co2: 0, returnEcoCoins: 0 };
+      if (packagingType === 'eco') {
+        ecoDataMap[p.addedBy].ecoCoins += p.quantity * 10;
+        ecoDataMap[p.addedBy].co2 += p.quantity * 5;
+      }
+      if (returnPackage) {
+        ecoDataMap[p.addedBy].returnEcoCoins += p.quantity * 10;
+      }
+    }
+
+    for (const userId in ecoDataMap) {
+      const ecoCoinsEarned = ecoDataMap[userId].ecoCoins + ecoDataMap[userId].returnEcoCoins;
+      const co2Reduced = ecoDataMap[userId].co2;
+      const ecoIncentives = [];
+      const co2SavedLogs = [];
+
+      if (ecoDataMap[userId].ecoCoins > 0) {
+        ecoIncentives.push({ date: dateNow, type: 'eco_purchase', ecoCoinsEarned: ecoDataMap[userId].ecoCoins });
+        co2SavedLogs.push({ date: dateNow, amount: co2Reduced, reason: 'eco_purchase' });
+      }
+      if (ecoDataMap[userId].returnEcoCoins > 0) {
+        ecoIncentives.push({ date: dateNow, type: 'return_package', ecoCoinsEarned: ecoDataMap[userId].returnEcoCoins });
+      }
+
+      await User.findByIdAndUpdate(userId, {
+        $inc: { ecoCoins: ecoCoinsEarned },
+        $push: {
+          orders: order._id,
+          ecoIncentives: { $each: ecoIncentives },
+          co2SavedLogs: { $each: co2SavedLogs }
+        }
+      });
+    }
+
+    res.status(201).json({ message: 'Order created successfully', order });
+  } catch (err) {
+    console.error('Error creating order after payment:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 // // 3. Get logged-in user's orders
 const getUserOrders = async (req, res) => {
   try {
     const userId = req.user.id;
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    const orders = await Order.find({userId,paymentStatus: { $in: ['paid', 'cod','cancelled'] }}).sort({ createdAt: -1 });
     res.status(200).json({ orders });
   } catch (err) {
     console.error('Error fetching user orders:', err);
@@ -458,10 +447,10 @@ module.exports = {
   getOrderById,
   getAllOrders,
   updateDeliveryStatus,
-  cancelOrder
+  cancelOrder,
+  createCODOrder,
   // createOrderAfterPament,
   // createRazorpayOrder,
   // verifyRazorpayPayment,
-  // createCODOrder,
 
 };
