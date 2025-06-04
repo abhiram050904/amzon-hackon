@@ -65,7 +65,7 @@ const orderSchema = new mongoose.Schema({
   },
   deliveryStatus: { 
     type: String, 
-    enum: ['processing', 'shipped', 'delivered'], 
+    enum: ['processing', 'shipped', 'out_for_delivery', 'delivered'], 
     default: 'processing' 
   },
 
@@ -101,3 +101,5 @@ discountReason: { type: String },
     default: Date.now 
   }
 });
+
+

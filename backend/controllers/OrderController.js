@@ -1,178 +1,104 @@
-// const Order = require('../Models/OrderModel');
-// const User = require('../Models/UserModel');
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const User = require('../models/User');
 
-// const createOrder = async (req, res) => {
-//   try {
-//     const {
-//       userId,
-//       products,
-//       orderType = 'normal',
-//       isGroupOrder = false,
-//       groupOrderId = null,
-//       returnPackageSelected = false
-//     } = req.body;
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 
-//     if (!userId || !products || !Array.isArray(products) || products.length === 0) {
-//       return res.status(400).json({ message: 'User ID and products are required' });
-//     }
 
-//     // Basic validation on products
-//     for (const item of products) {
-//       if (!item.productId || !item.quantity || item.quantity < 1) {
-//         return res.status(400).json({ message: 'Each product must have a valid productId and quantity >= 1' });
-//       }
-//     }
-
-//     // Calculate total CO2 reduced & eco coins (logic could be expanded later)
-//     let co2Reduced = 0;
-//     let ecoCoinsEarned = 0;
-//     if (orderType === 'eco') {
-//       // For example: 10 ecoCoins and 5kg CO2 reduced per product quantity, customize as needed
-//       ecoCoinsEarned = products.reduce((sum, p) => sum + p.quantity * 10, 0);
-//       co2Reduced = products.reduce((sum, p) => sum + p.quantity * 5, 0);
-//     }
-
-//     const order = new Order({
-//       userId,
-//       products,
-//       orderType,
-//       co2Reduced,
-//       ecoCoinsEarned,
-//       isGroupOrder,
-//       groupOrderId,
-//       returnPackageSelected,
-//       paymentStatus: 'pending',
-//       deliveryStatus: 'processing'
-//     });
-
-//     await order.save();
-
-//     // Update user: add order id, increment ecoCoins, append co2SavedLogs
-//     await User.findByIdAndUpdate(userId, {
-//       $inc: { ecoCoins: ecoCoinsEarned },
-//       $push: { 
-//         co2SavedLogs: { amount: co2Reduced, date: new Date() },
-//         orders: order._id
-//       }
-//     });
-
-//     return res.status(201).json({ message: 'Order created successfully', orderId: order._id });
-
-//   } catch (err) {
-//     console.error('Error creating order:', err);
-//     return res.status(500).json({ error: err.message });
-//   }
-// };
-
-// const getOrder = async (req, res) => {
-//   try {
-//     const orderId = req.params.id;
-
-//     if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
-//       return res.status(400).json({ message: 'Invalid order ID format' });
-//     }
-
-//     const order = await Order.findById(orderId)
-//       .populate('userId', 'name email')          
-//       .populate('products.productId', 'name price ecoRating'); 
-
-//     if (!order) {
-//       return res.status(404).json({ message: 'Order not found' });
-//     }
-
-//     return res.json(order);
-
-//   } catch (err) {
-//     console.error('Error fetching order:', err);
-//     return res.status(500).json({ error: err.message });
-//   }
-// };
-
-// const listOrders = async (req, res) => {
-//   try {
-//     const { userId } = req.query;
-
-//     let query = {};
-//     if (userId) {
-//       query.userId = userId;
-//     }
-
-//     const orders = await Order.find(query)
-//       .populate('userId', 'name email')
-//       .populate('products.productId', 'name price ecoRating')
-//       .sort({ createdAt: -1 });
-
-//     return res.json(orders);
-
-//   } catch (err) {
-//     console.error('Error listing orders:', err);
-//     return res.status(500).json({ error: err.message });
-//   }
-// };
-
-// // Update order payment status or delivery status
-// const updateOrderStatus = async (req, res) => {
-//   try {
-//     const orderId = req.params.id;
-//     const { paymentStatus, deliveryStatus } = req.body;
-
-//     if (!orderId.match(/^[0-9a-fA-F]{24}$/)) {
-//       return res.status(400).json({ message: 'Invalid order ID format' });
-//     }
-
-//     const updateData = {};
-//     if (paymentStatus) {
-//       if (!['pending', 'paid', 'failed'].includes(paymentStatus)) {
-//         return res.status(400).json({ message: 'Invalid payment status value' });
-//       }
-//       updateData.paymentStatus = paymentStatus;
-//     }
-
-//     if (deliveryStatus) {
-//       if (!['processing', 'shipped', 'delivered'].includes(deliveryStatus)) {
-//         return res.status(400).json({ message: 'Invalid delivery status value' });
-//       }
-//       updateData.deliveryStatus = deliveryStatus;
-//     }
-
-//     if (Object.keys(updateData).length === 0) {
-//       return res.status(400).json({ message: 'No valid status fields provided for update' });
-//     }
-
-//     const updatedOrder = await Order.findByIdAndUpdate(orderId, updateData, { new: true });
-
-//     if (!updatedOrder) {
-//       return res.status(404).json({ message: 'Order not found' });
-//     }
-
-//     return res.json({ message: 'Order status updated', order: updatedOrder });
-
-//   } catch (err) {
-//     console.error('Error updating order status:', err);
-//     return res.status(500).json({ error: err.message });
-//   }
-// };
-
-// module.exports = {
-//   createOrder,
-//   getOrder,
-//   listOrders,
-//   updateOrderStatus
-// };
+const razorpayInstance = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_SECRET
+});
 
 
 
+// 1. Create Razorpay Order
+const createRazorpayOrder = async (req, res) => {
+  try {
+    const { amount, currency = 'INR' } = req.body;
+
+    const razorpayOrder = await razorpayInstance.orders.create({
+      amount: amount * 100, // convert to paisa
+      currency,
+      receipt: `rcpt_${Date.now()}`,
+      payment_capture: 1
+    });
+
+    res.status(200).json({ order: razorpayOrder });
+  } catch (err) {
+    console.error('Razorpay order creation error:', err);
+    res.status(500).json({ message: 'Failed to create Razorpay order' });
+  }
+};
+
+// 2. Verify Razorpay Payment & Create Order
+const verifyRazorpayPayment = async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      orderDetails // includes everything required to create order
+    } = req.body;
+
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    const isValid = expectedSignature === razorpay_signature;
+
+    if (!isValid) {
+      return res.status(400).json({ message: 'Invalid Razorpay signature' });
+    }
+
+    // If valid, create paid order
+    req.body = {
+      ...orderDetails,
+      paymentInfo: {
+        provider: 'razorpay',
+        transactionId: razorpay_payment_id
+      }
+    };
+
+    await createOrderAfterPayment(req, res);
+  } catch (err) {
+    console.error('Payment verification error:', err);
+    res.status(500).json({ message: 'Payment verification failed' });
+  }
+};
+
+// 3. Create COD Order directly (fallback)
+const createCODOrder = async (req, res) => {
+  try {
+    const orderDetails = req.body;
+
+    req.body = {
+      ...orderDetails,
+      paymentInfo: {
+        provider: 'cod',
+        transactionId: `COD-${Date.now()}`
+      }
+    };
+
+    await createOrderAfterPayment(req, res);
+  } catch (err) {
+    console.error('COD order creation failed:', err);
+    res.status(500).json({ message: 'COD order failed' });
+  }
+};
+
+// 1. Prepare individual order before payment
 const prepareIndividualOrder = async (req, res) => {
   try {
     const { items, packagingType, returnPackage } = req.body;
     const userId = req.user.id;
 
-    // Validate items
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'No items provided for order' });
     }
 
-    // Fetch products and calculate total
     const productIds = items.map(i => i.productId);
     const productsFromDB = await Product.find({ _id: { $in: productIds } });
 
@@ -205,17 +131,13 @@ const prepareIndividualOrder = async (req, res) => {
       totalAmount,
       discountPercent: 0
     });
-
   } catch (err) {
     console.error('Error preparing individual order:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-
-
-const Order = require('../models/Order');
-
+// 2. Create order after successful payment
 const createOrderAfterPayment = async (req, res) => {
   try {
     const {
@@ -229,8 +151,31 @@ const createOrderAfterPayment = async (req, res) => {
       discountPercent,
       discountReason,
       paymentInfo,
-      shippingAddress
+      shippingAddress = {}
     } = req.body;
+
+    let ecoCoinsEarned = 0;
+    let co2Reduced = 0;
+    const ecoIncentives = [];
+    const co2SavedLogs = [];
+
+    const dateNow = new Date();
+
+    if (packagingType === 'eco') {
+      const coins = products.reduce((sum, p) => sum + p.quantity * 10, 0);
+      const co2 = products.reduce((sum, p) => sum + p.quantity * 5, 0);
+      ecoCoinsEarned += coins;
+      co2Reduced += co2;
+      ecoIncentives.push({ date: dateNow, type: 'eco_purchase', ecoCoinsEarned: coins });
+      co2SavedLogs.push({ date: dateNow, amount: co2, reason: 'eco_purchase' });
+    }
+
+    if (returnPackage) {
+      const coins = products.reduce((sum, p) => sum + p.quantity * 10, 0);
+      ecoCoinsEarned += coins;
+      ecoIncentives.push({ date: dateNow, type: 'return_package', ecoCoinsEarned: coins });
+      co2SavedLogs.push({ date: dateNow, amount: 0, reason: 'return_package' }); // Optional: define CO2 savings if needed
+    }
 
     const order = new Order({
       userId,
@@ -245,15 +190,27 @@ const createOrderAfterPayment = async (req, res) => {
       paymentInfo: {
         provider: paymentInfo.provider,
         transactionId: paymentInfo.transactionId,
-        paidAt: new Date()
+        paidAt: dateNow
       },
       paymentStatus: 'paid',
       deliveryStatus: 'processing',
       orderType: packagingType === 'eco' ? 'eco' : 'normal',
-      shippingAddress
+      shippingAddress,
+      ecoCoinsEarned,
+      co2Reduced,
+      expectedDeliveryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
     });
 
     await order.save();
+
+    await User.findByIdAndUpdate(userId, {
+      $inc: { ecoCoins: ecoCoinsEarned },
+      $push: {
+        orders: order._id,
+        ecoIncentives: { $each: ecoIncentives },
+        co2SavedLogs: { $each: co2SavedLogs }
+      }
+    });
 
     res.status(201).json({ message: 'Order created successfully', order });
   } catch (err) {
@@ -262,8 +219,7 @@ const createOrderAfterPayment = async (req, res) => {
   }
 };
 
-
-
+// 3. Get logged-in user's orders
 const getMyOrders = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -275,10 +231,12 @@ const getMyOrders = async (req, res) => {
   }
 };
 
-
+// 4. Get a specific order by ID
 const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.orderId).populate('products.productId');
+    const order = await Order.findById(req.params.orderId)
+      .populate('products.productId')
+      .populate('userId', 'name email');
     if (!order) return res.status(404).json({ message: 'Order not found' });
     res.status(200).json({ order });
   } catch (err) {
@@ -287,11 +245,86 @@ const getOrderById = async (req, res) => {
   }
 };
 
+// 5. Admin: Get all orders
+const getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().populate('userId').sort({ createdAt: -1 });
+    res.status(200).json({ orders });
+  } catch (err) {
+    console.error('Admin order fetch error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+const updateDeliveryStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['processing', 'shipped', 'out_for_delivery', 'delivered'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid delivery status' });
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { deliveryStatus: status },
+      { new: true }
+    );
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    res.status(200).json({ message: 'Delivery status updated', order });
+  } catch (err) {
+    console.error('Error updating delivery status:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+const cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin';
+
+    const order = await Order.findById(orderId);
+
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Only allow cancel if not shipped, unless admin
+    if (!isAdmin && order.userId.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized to cancel this order' });
+    }
+
+    if (!isAdmin && ['shipped', 'out_for_delivery', 'delivered'].includes(order.deliveryStatus)) {
+      return res.status(400).json({ message: 'Order cannot be cancelled after shipment' });
+    }
+
+    order.deliveryStatus = 'cancelled';
+    order.paymentStatus = order.paymentStatus === 'paid' ? 'refund_initiated' : 'cancelled';
+
+    await order.save();
+
+    res.status(200).json({ message: 'Order cancelled successfully', order });
+  } catch (err) {
+    console.error('Error cancelling order:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 
 module.exports = {
   prepareIndividualOrder,
   createOrderAfterPayment,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  createCODOrder,
   getMyOrders,
-  getOrderById
+  getOrderById,
+  getAllOrders,
+  updateDeliveryStatus,
+  cancelOrder
 };
