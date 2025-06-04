@@ -7,6 +7,7 @@ const userRoutes=require('./routes/UserRoutes')
 const productRoutes=require('./routes/ProductRoutes')
 const cartRoutes=require('./routes/CartRoutes')
 const groupOrderRoutes=require('./routes/GroupOrderRoutes')
+const orderRoutes=require('./routes/OrderRoutes')
 dotenv.config();
 
 const app = express();
@@ -18,6 +19,7 @@ app.use('/api/user',userRoutes)
 app.use('/api/products',productRoutes)
 app.use('/api/cart',cartRoutes)
 app.use('/api/group-order',groupOrderRoutes)
+app.use('/api/order',orderRoutes)
 
 
 mongoose.connect(process.env.MONGO_URI, {

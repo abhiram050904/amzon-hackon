@@ -6,29 +6,17 @@ const orderSchema = new mongoose.Schema({
     required: true 
   },
 
-  products: [{
-    productId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'Product', 
-      required: true 
-    },
-    quantity: { 
-      type: Number, 
-      required: true, 
-      min: 1 
-    },
-    packagingType: {
-      type: String,
-      enum: ['eco', 'gift', 'standard'],
-      default: 'standard'
-    },
-    priceAtPurchase: {
-      type: Number,
-      required: true
+   products: [
+    {
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+      quantity: Number,
+      packagingType: String,
+      priceAtPurchase: Number,
+      addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
     }
-  }],
+  ],
 
-  orderType: { 
+    PackageType: { 
     type: String, 
     enum: ['normal', 'eco','standard'], 
     default: 'normal' 
@@ -100,6 +88,6 @@ discountReason: { type: String },
     type: Date, 
     default: Date.now 
   }
-});
+}, { timestamps: true });
 
-
+module.exports = mongoose.model('Order', orderSchema);
