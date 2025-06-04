@@ -156,157 +156,93 @@ const handleGroupOrderBeforePayment = async (req, res) => {
 };
 
 
-// if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-//   throw new Error('Missing Razorpay configuration. Please set RAZORPAY_KEY_ID and RAZORPAY_SECRET in .env');
-// }
+if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+  throw new Error('Missing Razorpay configuration. Please set RAZORPAY_KEY_ID and RAZORPAY_SECRET in .env');
+}
 
 
-// const razorpayInstance = new Razorpay({
-//   key_id: process.env.RAZORPAY_KEY_ID,
-//   key_secret: process.env.RAZORPAY_KEY_SECRETs
-// });
+const razorpayInstance = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRETs
+});
 
 
 
 // // 1. Create Razorpay Order
-// const createRazorpayOrder = async (req, res) => {
-//   try {
-//     const { amount, currency = 'INR' } = req.body;
+const createRazorpayOrder = async (req, res) => {
+  try {
+    const { amount, currency = 'INR' } = req.body;
 
-//     const razorpayOrder = await razorpayInstance.orders.create({
-//       amount: amount * 100, // convert to paisa
-//       currency,
-//       receipt: `rcpt_${Date.now()}`,
-//       payment_capture: 1
-//     });
+    const razorpayOrder = await razorpayInstance.orders.create({
+      amount: amount * 100, // convert to paisa
+      currency,
+      receipt: `rcpt_${Date.now()}`,
+      payment_capture: 1
+    });
 
-//     res.status(200).json({ order: razorpayOrder });
-//   } catch (err) {
-//     console.error('Razorpay order creation error:', err);
-//     res.status(500).json({ message: 'Failed to create Razorpay order' });
-//   }
-// };
+    res.status(200).json({ order: razorpayOrder });
+  } catch (err) {
+    console.error('Razorpay order creation error:', err);
+    res.status(500).json({ message: 'Failed to create Razorpay order' });
+  }
+};
 
 // // 2. Verify Razorpay Payment & Create Order
-// const verifyRazorpayPayment = async (req, res) => {
-//   try {
-//     const {
-//       razorpay_order_id,
-//       razorpay_payment_id,
-//       razorpay_signature,
-//       orderDetails // includes everything required to create order
-//     } = req.body;
+const verifyRazorpayPayment = async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      orderDetails // includes everything required to create order
+    } = req.body;
 
-//     const expectedSignature = crypto
-//       .createHmac('sha256', process.env.RAZORPAY_SECRET)
-//       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-//       .digest('hex');
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
 
-//     const isValid = expectedSignature === razorpay_signature;
+    const isValid = expectedSignature === razorpay_signature;
 
-//     if (!isValid) {
-//       return res.status(400).json({ message: 'Invalid Razorpay signature' });
-//     }
+    if (!isValid) {
+      return res.status(400).json({ message: 'Invalid Razorpay signature' });
+    }
 
-//     // If valid, create paid order
-//     req.body = {
-//       ...orderDetails,
-//       paymentInfo: {
-//         provider: 'razorpay',
-//         transactionId: razorpay_payment_id
-//       }
-//     };
+    // If valid, create paid order
+    req.body = {
+      ...orderDetails,
+      paymentInfo: {
+        provider: 'razorpay',
+        transactionId: razorpay_payment_id
+      }
+    };
 
-//     await createOrderAfterPayment(req, res);
-//   } catch (err) {
-//     console.error('Payment verification error:', err);
-//     res.status(500).json({ message: 'Payment verification failed' });
-//   }
-// };
+    await createOrderAfterPayment(req, res);
+  } catch (err) {
+    console.error('Payment verification error:', err);
+    res.status(500).json({ message: 'Payment verification failed' });
+  }
+};
 
 // // 3. Create COD Order directly (fallback)
-// const createCODOrder = async (req, res) => {
-//   try {
-//     const orderDetails = req.body;
+const createCODOrder = async (req, res) => {
+  try {
+    const orderDetails = req.body;
 
-//     req.body = {
-//       ...orderDetails,
-//       paymentInfo: {
-//         provider: 'cod',
-//         transactionId: `COD-${Date.now()}`
-//       }
-//     };
+    req.body = {
+      ...orderDetails,
+      paymentInfo: {
+        provider: 'cod',
+        transactionId: `COD-${Date.now()}`
+      }
+    };
 
-//     await createOrderAfterPayment(req, res);
-//   } catch (err) {
-//     console.error('COD order creation failed:', err);
-//     res.status(500).json({ message: 'COD order failed' });
-//   }
-// };
-
-// // 1. Prepare individual order before payment
-// const prepareIndividualOrder = async (req, res) => {
-//   try {
-//     const {
-//       items,
-//       packagingType,
-//       returnPackage,
-//       shippingAddress,
-//       discountPercent,
-//       discountReason
-//     } = req.body;
-
-//     const userId = req.user.id;
-
-//     if (!items || !Array.isArray(items) || items.length === 0) {
-//       return res.status(400).json({ message: 'No items provided for order' });
-//     }
-
-//     const productIds = items.map(i => i.productId);
-//     const productsFromDB = await Product.find({ _id: { $in: productIds } });
-
-//     const products = [];
-//     let totalAmount = 0;
-
-//     for (const item of items) {
-//       const product = productsFromDB.find(p => p._id.toString() === item.productId);
-//       if (!product) continue;
-
-//       const price = product.price;
-//       const quantity = item.quantity;
-
-//       products.push({
-//         productId: product._id,
-//         quantity,
-//         packagingType,
-//         priceAtPurchase: price
-//       });
-
-//       totalAmount += quantity * price;
-//     }
-
-//     // Apply discount
-//     const discountedAmount = totalAmount - (totalAmount * (discountPercent / 100));
-
-//     // Save details in session or send to frontend for Razorpay payment
-//     return res.status(200).json({
-//       message: 'Proceed to payment',
-//       userId,
-//       isGroupOrder: false,
-//       products,
-//       packagingType,
-//       returnPackage,
-//       shippingAddress,
-//       totalAmount: discountedAmount,
-//       originalAmount: totalAmount,
-//       discountPercent,
-//       discountReason
-//     });
-//   } catch (err) {
-//     console.error('Error preparing individual order:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+    await createOrderAfterPayment(req, res);
+  } catch (err) {
+    console.error('COD order creation failed:', err);
+    res.status(500).json({ message: 'COD order failed' });
+  }
+};
 
 
 // // 2. Create order after successful payment
@@ -419,41 +355,42 @@ const handleGroupOrderBeforePayment = async (req, res) => {
 // };
 
 // // 3. Get logged-in user's orders
-// const getMyOrders = async (req, res) => {
-//   try {
-//     const userId = req.user.id;
-//     const orders = await Order.find({ userId }).sort({ createdAt: -1 });
-//     res.status(200).json({ orders });
-//   } catch (err) {
-//     console.error('Error fetching user orders:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+const getUserOrders = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    res.status(200).json({ orders });
+  } catch (err) {
+    console.error('Error fetching user orders:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 // // 4. Get a specific order by ID
-// const getOrderById = async (req, res) => {
-//   try {
-//     const order = await Order.findById(req.params.orderId)
-//       .populate('products.productId')
-//       .populate('userId', 'name email');
-//     if (!order) return res.status(404).json({ message: 'Order not found' });
-//     res.status(200).json({ order });
-//   } catch (err) {
-//     console.error('Error fetching order:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+const getOrderById = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.orderId)
+    const userId=req.user.id;
+
+    
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.status(200).json({ order });
+  } catch (err) {
+    console.error('Error fetching order:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 // // 5. Admin: Get all orders
-// const getAllOrders = async (req, res) => {
-//   try {
-//     const orders = await Order.find().populate('userId').sort({ createdAt: -1 });
-//     res.status(200).json({ orders });
-//   } catch (err) {
-//     console.error('Admin order fetch error:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+const getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().populate('userId').sort({ createdAt: -1 });
+    res.status(200).json({ orders });
+  } catch (err) {
+    console.error('Admin order fetch error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 
 // const updateDeliveryStatus = async (req, res) => {
@@ -517,15 +454,15 @@ const handleGroupOrderBeforePayment = async (req, res) => {
 
 module.exports = {
   handleIndividualOrderBeforePayment,
-  handleGroupOrderBeforePayment
-  // prepareIndividualOrder,
+  handleGroupOrderBeforePayment,
+  getUserOrders,
+  getOrderById,
+  getAllOrders
   // createOrderAfterPayment,
   // createRazorpayOrder,
   // verifyRazorpayPayment,
   // createCODOrder,
-  // getMyOrders,
-  // getOrderById,
-  // getAllOrders,
+  
   // updateDeliveryStatus,
   // cancelOrder
 };

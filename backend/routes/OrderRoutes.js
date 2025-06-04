@@ -12,7 +12,8 @@ const {
   updateDeliveryStatus,
   cancelOrder,
   handleIndividualOrderBeforePayment,
-  handleGroupOrderBeforePayment
+  handleGroupOrderBeforePayment,
+  getUserOrders
 } = require('../controllers/OrderController');
 
 const authUser = require('../middlewares/authUser');
@@ -37,13 +38,11 @@ router.post('/create-group-order',authUser,handleGroupOrderBeforePayment)
     // router.post('/create', authUser, createOrderAfterPayment);
 
     // // Get logged-in user's orders
-    // router.get('/myorders', authUser, getMyOrders);
+    router.get('/myorders', authUser, getUserOrders);
+    router.get('/orderById/:orderId',authUser,getOrderById);
 
-    // // Get order by ID
-    // router.get('/:orderId', authUser, getOrderById);
-
-    // // Admin: Get all orders
-    // router.get('/', authUser, getAllOrders);
+    // Admin: Get all orders
+    router.get('/get-all-orders-admin', getAllOrders);
 
     // // Update delivery status (admin or user)
     // router.patch('/:orderId/delivery-status', authUser, updateDeliveryStatus);
