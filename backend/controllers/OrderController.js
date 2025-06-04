@@ -393,63 +393,62 @@ const getAllOrders = async (req, res) => {
 };
 
 
-// const updateDeliveryStatus = async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-//     const { status } = req.body;
+const updateDeliveryStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
 
-//     const validStatuses = ['processing', 'shipped', 'out_for_delivery', 'delivered'];
-//     if (!validStatuses.includes(status)) {
-//       return res.status(400).json({ message: 'Invalid delivery status' });
-//     }
+    const validStatuses = ['processing', 'shipped', 'out_for_delivery', 'delivered'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid delivery status' });
+    }
 
-//     const order = await Order.findByIdAndUpdate(
-//       orderId,
-//       { deliveryStatus: status },
-//       { new: true }
-//     );
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { deliveryStatus: status },
+      { new: true }
+    );
 
-//     if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
-//     res.status(200).json({ message: 'Delivery status updated', order });
-//   } catch (err) {
-//     console.error('Error updating delivery status:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+    res.status(200).json({ message: 'Delivery status updated', order });
+  } catch (err) {
+    console.error('Error updating delivery status:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 
 
-// const cancelOrder = async (req, res) => {
-//   try {
-//     const { orderId } = req.params;
-//     const userId = req.user.id;
-//     const isAdmin = req.user.role === 'admin';
+const cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.id;
 
-//     const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId);
 
-//     if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
-//     // Only allow cancel if not shipped, unless admin
-//     if (!isAdmin && order.userId.toString() !== userId) {
-//       return res.status(403).json({ message: 'Unauthorized to cancel this order' });
-//     }
+    // Only allow cancel if not shipped, unless admin
+    if (order.userId.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized to cancel this order' });
+    }
 
-//     if (!isAdmin && ['shipped', 'out_for_delivery', 'delivered'].includes(order.deliveryStatus)) {
-//       return res.status(400).json({ message: 'Order cannot be cancelled after shipment' });
-//     }
+    if (['shipped', 'out_for_delivery', 'delivered'].includes(order.deliveryStatus)) {
+      return res.status(400).json({ message: 'Order cannot be cancelled after shipment' });
+    }
 
-//     order.deliveryStatus = 'cancelled';
-//     order.paymentStatus = order.paymentStatus === 'paid' ? 'refund_initiated' : 'cancelled';
+    order.deliveryStatus = 'cancelled';
+    order.paymentStatus = order.paymentStatus === 'paid' ? 'refund_initiated' : 'cancelled';
 
-//     await order.save();
+    await order.save();
 
-//     res.status(200).json({ message: 'Order cancelled successfully', order });
-//   } catch (err) {
-//     console.error('Error cancelling order:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+    res.status(200).json({ message: 'Order cancelled successfully', order });
+  } catch (err) {
+    console.error('Error cancelling order:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 
 module.exports = {
@@ -457,12 +456,12 @@ module.exports = {
   handleGroupOrderBeforePayment,
   getUserOrders,
   getOrderById,
-  getAllOrders
-  // createOrderAfterPayment,
+  getAllOrders,
+  updateDeliveryStatus,
+  cancelOrder
+  // createOrderAfterPament,
   // createRazorpayOrder,
   // verifyRazorpayPayment,
   // createCODOrder,
-  
-  // updateDeliveryStatus,
-  // cancelOrder
+
 };

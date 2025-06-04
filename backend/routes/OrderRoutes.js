@@ -45,9 +45,9 @@ router.post('/create-group-order',authUser,handleGroupOrderBeforePayment)
     router.get('/get-all-orders-admin', getAllOrders);
 
     // // Update delivery status (admin or user)
-    // router.patch('/:orderId/delivery-status', authUser, updateDeliveryStatus);
+    router.patch('/:orderId/delivery-status', authUser, updateDeliveryStatus);
 
     // // Cancel order (user)
-    // router.patch('/:orderId/cancel', authUser, cancelOrder);
+    router.patch('/:orderId/cancel', authUser, cancelOrder);
 
 module.exports = router;
